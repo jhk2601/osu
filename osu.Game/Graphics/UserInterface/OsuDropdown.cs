@@ -234,8 +234,8 @@ namespace osu.Game.Graphics.UserInterface
                         set => Label.Text = value;
                     }
 
-                    public readonly OsuSpriteText Label;
-                    public readonly SpriteIcon Chevron;
+                    public OsuSpriteText Label;
+                    public SpriteIcon Chevron;
 
                     private const float chevron_offset = -3;
 

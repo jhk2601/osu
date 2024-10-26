@@ -10,16 +10,24 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
+using osuTK;
+using osuTK.Graphics;
 using Realms;
 
 namespace osu.Game.Overlays.Settings.Sections
@@ -133,6 +141,81 @@ namespace osu.Game.Overlays.Settings.Sections
             private partial class SkinDropdownControl : DropdownControl
             {
                 protected override LocalisableString GenerateItemText(Live<SkinInfo> item) => item.ToString();
+                protected override DropdownMenu CreateMenu() => new SkinDropdownMenu();
+
+                protected partial class SkinDropdownMenu : OsuDropdownMenu
+                {
+                    protected override DrawableDropdownMenuItem CreateDrawableDropdownMenuItem(MenuItem item) => new DrawableSkinDropdownMenuItem(item);
+
+                    private partial class DrawableSkinDropdownMenuItem : DrawableOsuDropdownMenuItem
+                    {
+                        private SkinContent content;
+
+                        public DrawableSkinDropdownMenuItem(MenuItem item)
+                            : base(item)
+                        {
+                        }
+
+                        protected override Drawable CreateContent() => content = new SkinContent();
+
+                        protected override bool OnClick(ClickEvent e)
+                        {
+                            if (isHeartButtonClick(e))
+                            {
+                                return false;
+                            }
+
+                            return base.OnClick(e);
+                        }
+
+                        private bool isHeartButtonClick(ClickEvent e) =>
+                            content.HeartButton.ReceivePositionalInputAt(e.ScreenSpaceMousePosition);
+
+                        protected partial class SkinContent : Content
+                        {
+                            public readonly FavoriteSkinButton HeartButton;
+
+                            public SkinContent()
+                            {
+                                ClearInternal();
+
+                                InternalChildren = new Drawable[]
+                                {
+                                    HeartButton = new FavoriteSkinButton()
+                                    {
+                                        Anchor = Anchor.CentreRight,
+                                        Origin = Anchor.CentreRight,
+                                        Width = 40,
+                                        Position = new Vector2(-5, 0),
+                                    },
+                                    Chevron = new SpriteIcon
+                                    {
+                                        Icon = FontAwesome.Solid.ChevronRight,
+                                        Size = new Vector2(8),
+                                        Alpha = 0,
+                                        X = -3,
+                                        Margin = new MarginPadding { Left = 3, Right = 3 },
+                                        Origin = Anchor.CentreLeft,
+                                        Anchor = Anchor.CentreLeft,
+                                    },
+                                    Label = new TruncatingSpriteText
+                                    {
+                                        Padding = new MarginPadding { Left = 15, Right = 20 },
+                                        Origin = Anchor.CentreLeft,
+                                        Anchor = Anchor.CentreLeft,
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                };
+                            }
+
+                            [BackgroundDependencyLoader(true)]
+                            private void load(OverlayColourProvider colourProvider)
+                            {
+                                Chevron.Colour = colourProvider?.Background5 ?? Color4.Black;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -199,6 +282,90 @@ namespace osu.Game.Overlays.Settings.Sections
             private void delete()
             {
                 dialogOverlay?.Push(new SkinDeleteDialog(currentSkin.Value));
+            }
+        }
+
+        public partial class FavoriteSkinButton : OsuClickableContainer
+        {
+            [Resolved]
+            private SkinManager skins { get; set; }
+
+            private Bindable<Skin> currentSkin;
+            private Drawable background = null!;
+            private SpriteIcon icon = null!;
+
+            public FavoriteSkinButton()
+            {
+                RelativeSizeAxes = Axes.Y;
+                TooltipText = "Favorite skin?";
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuColour colour)
+            {
+                Child = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Alpha = 0.5f,
+                    Children = new[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Colour = Colour4.White,
+                            Alpha = 0f,
+                        },
+                        icon = new SpriteIcon
+                        {
+                            Anchor = Anchor.CentreRight,
+                            Origin = Anchor.Centre,
+                            Margin = new MarginPadding { Right = 10 },
+                            Size = new Vector2(12),
+                            Icon = FontAwesome.Regular.Heart,
+                            Colour = colour.Red,
+                        }
+                    }
+                };
+            }
+
+            public override bool HandlePositionalInput => true;
+
+            protected override bool OnMouseDown(MouseDownEvent e)
+            {
+                background.ScaleTo(.95f, 200, Easing.OutQuint);
+                return true;
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                toggleFavorite();
+                return true;
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.FadeTo(0.2f, 200, Easing.OutQuint);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.FadeTo(0f, 100, Easing.OutQuint);
+                base.OnHoverLost(e);
+            }
+
+            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => base.ReceivePositionalInputAt(screenSpacePos);
+
+            private void updateBackgroundColour()
+            {
+                background.Colour = IsHovered ? Colour4.Black.Opacity(0.5f) : Colour4.White;
+            }
+
+            private void toggleFavorite()
+            {
+                icon.Icon = icon.Icon.Equals(FontAwesome.Regular.Heart)
+                    ? FontAwesome.Solid.Heart
+                    : FontAwesome.Regular.Heart;
             }
         }
     }
